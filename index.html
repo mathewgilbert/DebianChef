@@ -1,1 +1,124 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DebianChef</title>
+    <style>
+        :root{
+            --bg:#0d1117;--text:#c9d1d9;--folder:#58a6ff;--file:#8b949e;
+            --accent:#79c0ff;--border:#30363d;--hover:#161b22;
+        }
+        body{margin:0;padding:30px 40px;background:var(--bg);color:var(--text);
+             font-family:system-ui,sans-serif;line-height:1.6;}
+        h1{color:#fff;font-size:1.9rem;margin-bottom:25px;}
+        .tree ul{list-style:none;padding-left:26px;margin:0;border-left:1px solid var(--border);}
+        .tree li{position:relative;}
+        .tree li::before{content:"";position:absolute;top:13px;left:-13px;width:13px;
+                          border-bottom:1px solid var(--border);}
+        .caret{cursor:pointer;display:flex;align-items:center;padding:7px 10px;
+               border-radius:6px;transition:all .2s;}
+        .caret:hover{background:var(--hover);}
+        .caret::before{content:"ChevronRight";margin-right:9px;font-size:13px;
+                       color:#8b949e;transition:transform .2s;}
+        .caret-down::before{transform:rotate(90deg);}
+        .nested{display:none;animation:fade .3s;}
+        .active{display:block;}
+        .folder{color:var(--folder);font-weight:500;}
+        .file a{color:var(--file);text-decoration:none;}
+        .file a:hover{color:var(--accent);text-decoration:underline;}
+        .root{color:#a5d6a7;font-weight:600;font-size:1.15em;}
+        @keyframes fade{from{opacity:0;}to{opacity:1;}}
+        .info{font-size:0.9rem;color:#8b949e;margin-top:50px;opacity:0.8;}
+    </style>
+</head>
+<body>
 
+<h1>Project Structure</h1>
+
+<div class="tree">
+    <ul>
+        <li>
+            <span class="caret caret-down root">Root (semua file & folder)</span>
+            <ul class="nested active" id="root"></ul>
+        </li>
+    </ul>
+</div>
+
+<div class="info">
+    Menampilkan <strong>semua isi project</strong> kecuali file yang dikecualikan di bawah
+</div>
+
+<script type="module">
+const rootUl = document.getElementById('root');
+
+const EXCLUDE = [
+    'index.html',     
+    '.git',
+    '.gitignore',
+    '.env',
+    '.env.example',
+    'node_modules',
+    'vendor',
+    'storage',
+    '.DS_Store',
+    'Thumbs.db'
+];
+
+async function loadDir(path = '.', ul) {
+    try {
+        const res = await fetch(`/${path}`);
+        if (!res.ok) return;
+        const html = await res.text();
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const links = [...doc.querySelectorAll('a')].map(a => a.textContent.trim());
+
+        links
+            .filter(name => name && !['../', '?/'].includes(name))
+            .filter(name => !EXCLUDE.some(ex => name === ex || name.startsWith(ex + '/')))
+            .map(name => ({
+                name,
+                isDir: links.includes(name + '/')
+            }))
+            .sort((a, b) => {
+                if (a.isDir && !b.isDir) return -1;
+                if (!a.isDir && b.isDir) return 1;
+                return a.name.localeCompare(b.name);
+            })
+            .forEach(item => {
+                const { name, isDir } = item;
+                const fullPath = path === '.' ? name : `${path}/${name}`;
+                const li = document.createElement('li');
+                const span = document.createElement('span');
+                span.className = 'caret';
+
+                if (isDir) {
+                    span.classList.add('folder');
+                    span.textContent = name + '/';
+                    const subUl = document.createElement('ul');
+                    subUl.className = 'nested';
+                    li.appendChild(span);
+                    li.appendChild(subUl);
+
+                    span.onclick = () => {
+                        if (!subUl.children.length) loadDir(fullPath, subUl);
+                        span.classList.toggle('caret-down');
+                        subUl.classList.toggle('active');
+                    };
+                } else {
+                    span.className = 'file';
+                    span.innerHTML = `<a href="${fullPath}" target="_blank">${name}</a>`;
+                }
+                ul.appendChild(li);
+            });
+
+    } catch (e) {
+
+    }
+}
+
+loadDir('.', rootUl);
+</script>
+
+</body>
+</html>
